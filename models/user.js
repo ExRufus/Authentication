@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt')
 const { PrismaClient } = require("@prisma/client")
 const prisma = new PrismaClient();
+const jwt = require('jsonwebtoken')
 
 function encrypt(password) {
     return bcrypt.hashSync(password, 10);
@@ -37,7 +38,25 @@ async function findByPk(pk) {
   }
 }
 
-module.exports = {register, login, findByPk}
+const SECRET_KEY = "Ini rahasia ga boleh disebar-sebar";
+
+function generateToken(user) {
+  const payload = {
+    id: user.id,
+    email: user.email,
+  }
+  const token = jwt.sign(payload, SECRET_KEY) // payload => data si user yang ada di model
+  console.log({token});
+  return token;
+}
+
+function verifyToken(token) {
+  const isVerified = jwt.verify(token, SECRET_KEY)
+  console.log({isVerified})
+  return isVerified;
+}
+
+module.exports = {register, login, findByPk, generateToken, verifyToken}
 
 // class User {
 //     static #encrypt = (password) => bcrypt.hashSync(password, 10);
