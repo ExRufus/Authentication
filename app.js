@@ -1,110 +1,84 @@
-const express = require('express');
-const flash = require('express-flash');
-const session = require('express-session');
-require("dotenv").config();
-const app = express();
-const PORT = 8000;
+const express = require("express");
+const session = require("express-session");
+const flash = require("express-flash");
 const { PrismaClient } = require("@prisma/client");
-const {register, login, generateToken, verifyToken} = require("./models/user");
-const passport = require("./lib/passport");
 const prisma = new PrismaClient();
-const cookieParser = require('cookie-parser');
-const { verify } = require('jsonwebtoken');
+const {
+  loginController,
+  registerController,
+  logoutController,
+  whoamiController,
+} = require("./controllers/authController");
+const morgan = require("morgan");
+const { restrictPageAccess } = require("./middleware/restricPageAccess");
+const { restrictLoginPage } = require("./middleware/restrictLoginPage");
+const { createRoom, joinRoom, getAllRoomController, getRoomById, playGameController } = require("./controllers/roomController");
 
-// Middleware
-app.use(express.urlencoded({extended: false}));
+require("dotenv").config();
+
+const app = express();
+
+const { PORT } = process.env;
+
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(cookieParser());
 
-// Atur session:
-app.use(session({
-    secret: 'Buat ini jadi rahasia',
+app.use(
+  session({
+    secret: "Buat ini jadi rahasia",
     resave: false,
-    saveUninitialized: false
-}))
-
-// setting passport
-app.use(passport.initialize());
-app.use(passport.session());
-
-// setting flash:
-app.use(flash());
-app.set('view engine', 'ejs');
-
-function restrictLocalStrategy(req, res, next) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.redirect("/login");
-}
-
-// Fungsi untuk menendang user ke halaman utama, kalau dia sudah Authenticate.
-function pushToMainIfAuthed(req, res, next) {
-  const cookie = req.cookies.Chap7;
-  if (cookie === undefined) {
-    return next()
-  }
-  const isTokenVerified = verifyToken(cookie)
-  if (!isTokenVerified) {
-    return next()
-  }
-  res.redirect("/")
-}
-
-// Fungsi untuk menendang user ke halaman login, kalau dia belum authenticate
-function restrictByCheckCookie(req, res, next) {
-  const cookie = req.cookies.Chap7;
-  if (cookie === undefined) {
-    res.redirect('/login') 
-    return
-  }
-  const isTokenVerified = verifyToken(cookie)
-  if (!isTokenVerified) {
-    res.redirect("/login")
-    return
-  }
-  next();
-}
-
-app.get("/", restrictByCheckCookie, async(req, res) => {
-    const users = await prisma.user.findMany();
-    res.render("dashboard", {users});
-});
-
-app.get("/register", (req, res) => res.render("register")); 
-app.post("/register", async(req, res) => {
-    await register({ email: req.body.email, password: req.body.password});
-    res.redirect("/");
-});
-
-app.get("/whoami", restrictByCheckCookie, async (req, res) => {
-  res.render("whoami", {username: req.user.email});
-//   const users = await prisma.user.findUnique();
-})
-
-app.get("/login", pushToMainIfAuthed, (req, res) => res.render("login"));
-app.post("/login", passport.authenticate('local', {
-  successRedirect: "/",
-  failureRedirect: "/login",
-  failureFlash: true ,
+    saveUninitialized: false,
   })
 );
 
-app.post("/login/jwt", async (req, res) => {
-  try {
-    const user = await login(req.body)
-    const token = generateToken(user)
-    res.cookie('Chap7', token, { maxAge: 900000, httpOnly: true });
-    res.redirect("/");
-  } catch (error) {
-    res.redirect("/login")
-  }
-})
+// log only 4xx and 5xx responses to console
+app.use(morgan('dev', {
+  skip: function (req, res) { return res.statusCode < 400 }
+}))
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
-app.listen(PORT, () => { 
-  console.log(`Server is running on port: http://localhost:${PORT}`)
+
+app.use(flash());
+app.set("view engine", "ejs");
+
+// Routing
+app.get("/", restrictPageAccess, async (req, res) => {
+  const users = await prisma.user.findMany();
+  res.render("dashboard", { users });
 });
+app.get("/login", restrictLoginPage, (req, res) => res.render("login"));
+app.get("/register", (req, res) => res.render("register"));
+app.post("/login", loginController);
+app.post("/register", registerController);
+app.post("/logout", logoutController);
+app.get("/whoami", restrictPageAccess, whoamiController);
 
+app.get("/api/rooms", getAllRoomController)
+app.get("/api/room/:roomId", getRoomById)
+app.post("/api/login", loginController);
+app.post("/api/register", registerController);
+app.post("/api/createroom", createRoom);
+app.post("/api/joinroom/:roomId", joinRoom )
+app.get("/api/whoami", restrictPageAccess, whoamiController);
+app.post("/api/playgame/:roomId", playGameController)
+
+app.listen(PORT, () => {
+  console.log(`Server Running on port: http://localhost:${PORT}`);
+});  
+
+
+  // const cookie = req.cookies.Chap7;
+  // const token = req.session.token;
+  // if (token === undefined) {
+  //   return res.redirect('/login') 
+  // }
+  // const isTokenVerified = verifyToken(token)
+  // if (!isTokenVerified) {
+  //   return res.redirect("/login")
+  // }
+  // req.userId = decodedToken.userId
+  // next();
+// }
 // app.post("/login/jwt", (req, res) => {
 //   login(req.body)
 //   .then(user => {
@@ -130,3 +104,11 @@ app.listen(PORT, () => {
 //         res.redirect("/login")
 //     }
 // });
+
+
+// app.post("/login", passport.authenticate('local', {
+//   successRedirect: "/",
+//   failureRedirect: "/login",
+//   failureFlash: true ,
+//   })
+// );
