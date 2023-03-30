@@ -42,4 +42,10 @@ async function findByPk(pk) {
   }
 }
 
-module.exports = { register, login, findByPk };
+async function listUser(req, res) {
+  const users = await prisma.user.findMany();
+  // res.render("dashboard", { users });
+  return users;
+};
+
+module.exports = { register, login, findByPk, listUser };

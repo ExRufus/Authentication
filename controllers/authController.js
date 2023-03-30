@@ -1,4 +1,4 @@
-const { login, register, findByPk } = require("../models/user");
+const { login, register, findByPk, listUser } = require("../models/user");
 const jwt = require("jsonwebtoken");
 
 async function loginController(req, res) {
@@ -13,11 +13,21 @@ async function loginController(req, res) {
     );
 
     req.session.token = token;
-
+    console.log(req.session);
     res.redirect("/");
   } catch (error) {
     res.redirect("/login");
   }
+}
+
+async function viewDashboard(req, res) {
+  const users = await listUser()
+  res.status(200)
+  res.render('dashboard', {users})
+};
+
+async function viewLogin(req, res) {
+  res.render("login")
 }
 
 async function registerController(req, res) {
@@ -27,6 +37,10 @@ async function registerController(req, res) {
   } catch (error) { 
     res.redirect("/register");
   }
+}
+
+async function viewRegister(req, res) {
+  res.render("register")
 }
 
 async function logoutController(req, res) {
@@ -49,4 +63,7 @@ module.exports = {
   registerController,
   logoutController,
   whoamiController,
+  viewLogin,
+  viewRegister,
+  viewDashboard
 };

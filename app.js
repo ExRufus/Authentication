@@ -8,11 +8,14 @@ const {
   registerController,
   logoutController,
   whoamiController,
+  viewLogin,
+  viewRegister,
+  viewDashboard,
 } = require("./controllers/authController");
 const morgan = require("morgan");
 const { restrictPageAccess } = require("./middleware/restricPageAccess");
 const { restrictLoginPage } = require("./middleware/restrictLoginPage");
-const { createRoom, joinRoom, getAllRoomController, getRoomById, playGameController } = require("./controllers/roomController");
+const { createRoom, joinRoom, getAllRoomController, getRoomById, playGameController, gameResultController } = require("./controllers/roomController");
 
 require("dotenv").config();
 
@@ -26,8 +29,8 @@ app.use(express.json());
 app.use(
   session({
     secret: "Buat ini jadi rahasia",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
   })
 );
 
@@ -42,12 +45,9 @@ app.use(flash());
 app.set("view engine", "ejs");
 
 // Routing
-app.get("/", restrictPageAccess, async (req, res) => {
-  const users = await prisma.user.findMany();
-  res.render("dashboard", { users });
-});
-app.get("/login", restrictLoginPage, (req, res) => res.render("login"));
-app.get("/register", (req, res) => res.render("register"));
+app.get("/", restrictPageAccess, viewDashboard);
+app.get("/login", restrictLoginPage, viewLogin);
+app.get("/register", viewRegister);
 app.post("/login", loginController);
 app.post("/register", registerController);
 app.post("/logout", logoutController);
@@ -61,6 +61,7 @@ app.post("/api/createroom", createRoom);
 app.post("/api/joinroom/:roomId", joinRoom )
 app.get("/api/whoami", restrictPageAccess, whoamiController);
 app.post("/api/playgame/:roomId", playGameController)
+app.post("/api/result/:roomId", gameResultController)
 
 app.listen(PORT, () => {
   console.log(`Server Running on port: http://localhost:${PORT}`);
